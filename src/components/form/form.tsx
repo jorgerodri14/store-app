@@ -6,6 +6,7 @@ import {
   TextField,
 } from "@material-ui/core";
 import React, { useState } from "react";
+import { productService } from "../../services/productService";
 
 type Entries<T> = {
   [K in keyof T]: [K, T[K]];
@@ -14,9 +15,11 @@ type Entries<T> = {
 export const Form = () => {
   const [formValidation, setFormValidation] = useState({
     name: { value: "", error: "" },
-    size: { value: "", error: "" },
+    size: { value: 0, error: "" },
     type: { value: "", error: "" },
   });
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   type FormValidationKeysType = keyof typeof formValidation;
 
@@ -24,12 +27,9 @@ export const Form = () => {
     e.preventDefault();
     setFormValidation((prevFormValidation) => ({
       ...prevFormValidation,
-      form: {
-        ...prevFormValidation,
-        [e.target.id]: {
-          ...prevFormValidation[e.target.id as FormValidationKeysType],
-          value: e.target.value,
-        },
+      [e.target.id]: {
+        ...prevFormValidation[e.target.id as FormValidationKeysType],
+        value: e.target.value,
       },
     }));
   };
@@ -45,12 +45,9 @@ export const Form = () => {
       if ("name" in e.target) {
         return {
           ...prevFormValidation,
-          form: {
-            ...prevFormValidation,
-            [e.target.name as FormValidationKeysType]: {
-              ...prevFormValidation[e.target.name as FormValidationKeysType],
-              value: e.target.value,
-            },
+          [e.target.name as FormValidationKeysType]: {
+            ...prevFormValidation[e.target.name as FormValidationKeysType],
+            value: e.target.value,
           },
         };
       }
@@ -58,28 +55,59 @@ export const Form = () => {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    (Object.entries(formValidation) as Entries<typeof formValidation>).forEach(
-      ([key, { error, value }]) => {
-        setFormValidation((prevFormValidation) => ({
-          ...prevFormValidation,
+  const handleErrorMessage = (
+    key: FormValidationKeysType,
+    value: string | number
+  ) =>
+    setFormValidation((prevFormValidation) => ({
+      ...prevFormValidation,
+      [key]: {
+        ...prevFormValidation[key],
+        error: value ? "" : `The ${key} is required`,
+      },
+    }));
 
-          [key]: {
-            ...prevFormValidation[key],
-            error: value ? "" : `The ${key} is required`,
-          },
-        }));
-      }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    setIsSaving(true);
+
+    (Object.entries(formValidation) as Entries<typeof formValidation>).forEach(
+      ([key, { value }]) => handleErrorMessage(key, value)
     );
+
+    try {
+      setIsSuccess(false);
+      const {
+        name: { value: name },
+        size: { value: size },
+        type: { value: type },
+      } = formValidation;
+      await productService.saveProduct({ name, size, type });
+      setIsSuccess(true);
+    } catch (e) {}
+
+    setIsSaving(false);
+  };
+
+  const handleBlur = (
+    e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement, Element>
+  ) => {
+    e.preventDefault();
+    const { name, value } = e.target;
+
+    if (value) return;
+    handleErrorMessage(name as FormValidationKeysType, value);
   };
 
   return (
     <>
       <h1>Create product</h1>
+      {isSuccess && <p>Product Stored</p>}
       <form onSubmit={handleSubmit} action="#">
         <TextField
           onChange={handleChange}
+          onBlur={handleBlur}
           helperText={formValidation.name.error}
           label="name"
           id="name"
@@ -91,12 +119,14 @@ export const Form = () => {
           id="size"
           name="size"
           helperText={formValidation.size.error}
+          onBlur={handleBlur}
         />
         <InputLabel htmlFor="type">Type</InputLabel>
         <Select
           native
-          onChange={handleChangeSelect}
           value={formValidation.type.value}
+          onBlur={handleBlur}
+          onChange={handleChangeSelect}
           inputProps={{ name: "type", id: "type" }}
         >
           <option arial-label="None" value="" />
@@ -105,7 +135,9 @@ export const Form = () => {
           <option value="clothing">clothing</option>
         </Select>
         <FormHelperText>{formValidation.type.error}</FormHelperText>
-        <Button type="submit">Submit</Button>
+        <Button disabled={isSaving} type="submit">
+          Submit
+        </Button>
       </form>
     </>
   );
