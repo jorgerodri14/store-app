@@ -6,20 +6,23 @@ import {
   TextField,
 } from "@material-ui/core";
 import React, { useState } from "react";
-import { productService } from "../../services/productService";
+import { productService } from "../../infra/services/productService";
+
+const formValidationSeed = {
+  name: { value: "", error: "" },
+  size: { value: 0, error: "" },
+  type: { value: "", error: "" },
+}
 
 type Entries<T> = {
   [K in keyof T]: [K, T[K]];
 }[keyof T][];
 
 export const Form = () => {
-  const [formValidation, setFormValidation] = useState({
-    name: { value: "", error: "" },
-    size: { value: 0, error: "" },
-    type: { value: "", error: "" },
-  });
+  const [formValidation, setFormValidation] = useState(formValidationSeed);
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [errors, setErrors] = useState("")
 
   type FormValidationKeysType = keyof typeof formValidation;
 
@@ -75,6 +78,7 @@ export const Form = () => {
     (Object.entries(formValidation) as Entries<typeof formValidation>).forEach(
       ([key, { value }]) => handleErrorMessage(key, value)
     );
+    
 
     try {
       setIsSuccess(false);
@@ -85,7 +89,10 @@ export const Form = () => {
       } = formValidation;
       await productService.saveProduct({ name, size, type });
       setIsSuccess(true);
-    } catch (e) {}
+      setFormValidation(formValidationSeed);
+    } catch (e) {
+      if(e instanceof Error) setErrors(e.message)
+    }
 
     setIsSaving(false);
   };
@@ -104,6 +111,7 @@ export const Form = () => {
     <>
       <h1>Create product</h1>
       {isSuccess && <p>Product Stored</p>}
+      <p>{errors}</p>
       <form onSubmit={handleSubmit} action="#">
         <TextField
           onChange={handleChange}
@@ -112,6 +120,7 @@ export const Form = () => {
           label="name"
           id="name"
           name="name"
+          value={formValidation.name.value}
         />
         <TextField
           onChange={handleChange}
@@ -120,6 +129,8 @@ export const Form = () => {
           name="size"
           helperText={formValidation.size.error}
           onBlur={handleBlur}
+          type="number"
+          value={formValidation.size.value}
         />
         <InputLabel htmlFor="type">Type</InputLabel>
         <Select

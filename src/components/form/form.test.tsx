@@ -12,9 +12,11 @@ const server = setupServer(
       size: number;
       type: string;
     };
-
     if (name && size && type)
-      return res(ctx.status(HTTP_STATUS.CREATED_STATUS));
+      return res(
+        ctx.status(HTTP_STATUS.CREATED_STATUS),
+        ctx.json({ message: "Ok" })
+      );
 
     return res(ctx.status(HTTP_STATUS.ERROR_SERVER));
   })
@@ -23,6 +25,8 @@ const server = setupServer(
 beforeAll(() => server.listen());
 
 afterAll(() => server.close());
+
+afterEach(() => server.resetHandlers());
 
 // eslint-disable-next-line testing-library/no-render-in-setup
 beforeEach(() => render(<Form />));
@@ -82,7 +86,7 @@ describe("when the user blurs an empty field", () => {
   });
 });
 
-describe("when the user submits the form", () => {
+describe("when the user submits the form properly and the server returns created status", () => {
   it("should the submit button be disabled until the request is done", async () => {
     const submitBtn = screen.getByRole("button", { name: /submit/i });
 
@@ -96,18 +100,69 @@ describe("when the user submits the form", () => {
   });
 
   it('the form page must display the success message "Product stored" and clean the fields values', async () => {
-    fireEvent.change(screen.getByLabelText(/name/i), {
+    const nameInput = screen.getByLabelText(/name/i);
+    const typeInput = screen.getByLabelText(/type/i);
+    const sizeInput = screen.getByLabelText(/size/i);
+
+    fireEvent.change(nameInput, {
       target: { name: "name", value: "test-product" },
     });
-    fireEvent.change(screen.getByLabelText(/size/i), {
+    fireEvent.change(sizeInput, {
       target: { name: "size", value: Math.random() },
     });
-    fireEvent.change(screen.getByLabelText(/type/i), {
+    fireEvent.change(typeInput, {
       target: { name: "type", value: "electronic" },
     });
 
     fireEvent.click(screen.getByRole("button", { name: /submit/i }));
 
     expect(await screen.findByText(/product stored/i)).toBeInTheDocument();
+
+    expect(nameInput).toHaveValue("");
+    expect(sizeInput).toHaveValue(0);
+    expect(typeInput).toHaveValue("");
+  });
+});
+
+describe("when the user submits the form and the server return an unexpected error", () => {
+  it('the form page must display the error message "Unexpected error, please try again"', async () => {
+    server.use(
+      rest.post("/products", (req, res, ctx) => {
+        return res(
+          ctx.status(500),
+          ctx.json({ message: "Unexpected error, please try again" })
+        );
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    expect(
+      await screen.findByText(/unexpected error, please try again/i)
+    ).toBeInTheDocument();
+  });
+});
+
+describe("when the user submits the form and the server return an invalid error", () => {
+  it('the form page must display the error message "the form is invalid, the fields [fields1, ...fieldN] are required"', async () => {
+    server.use(
+      rest.post("/products", (req, res, ctx) => {
+        return res(
+          ctx.status(400),
+          ctx.json({
+            message:
+              "the form is invalid, the fields name, size, type are required",
+          })
+        );
+      })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    expect(
+      await screen.findByText(
+        /the form is invalid, the fields name, size, type are required/i
+      )
+    ).toBeInTheDocument();
   });
 });
