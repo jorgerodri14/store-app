@@ -6,7 +6,7 @@ import {
   TextField,
 } from "@material-ui/core";
 import React, { useState } from "react";
-import { productService } from "../../infra/services/productService";
+import { productService } from "../../core/services/productService";
 
 const formValidationSeed = {
   name: { value: "", error: "" },

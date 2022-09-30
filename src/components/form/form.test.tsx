@@ -166,3 +166,20 @@ describe("when the user submits the form and the server return an invalid error"
     ).toBeInTheDocument();
   });
 });
+
+
+describe("when the user submits the form and not found path", () => {
+  it('the form page must display the error message "Connection error, please try later"', async () => {
+    server.use(
+      rest.post("/products", (req, res, ctx) => res.networkError('Failed to connect'))
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /submit/i }));
+
+    expect(
+      await screen.findByText(
+        /Connection error, please try later/i
+      )
+    ).toBeInTheDocument();
+  });
+});
